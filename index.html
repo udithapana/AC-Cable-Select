@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>AC Cable Selection — Solar EPC</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#12161a">
+<meta name="background-color" content="#12161a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cable Select">
+<meta name="description" content="Solar inverter AC cable sizing — current capacity, grouping and voltage drop calculator.">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#12161a;
+    --panel:#181d22;
+    --panel-2:#1f252b;
+    --line:#2a3138;
+    --line-soft:#232a30;
+    --text:#e7e4dc;
+    --text-dim:#9aa3ab;
+    --text-faint:#5f6870;
+    --copper:#c9764a;
+    --copper-bright:#e08a58;
+    --alu:#a9b4bd;
+    --good:#6fae7a;
+    --warn:#d4a24c;
+    --bad:#c96a5a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans',sans-serif;
+    font-size:14px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  a{color:inherit;}
+
+  /* ---- Header ---- */
+  header{
+    border-bottom:1px solid var(--line);
+    padding:22px 28px 18px;
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:20px;
+    flex-wrap:wrap;
+  }
+  .brand{display:flex; align-items:center; gap:14px;}
+  .brand-mark{
+    width:38px;height:38px;flex:0 0 auto;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .brand-mark svg{width:100%;height:100%;}
+  h1{
+    font-size:17px;
+    font-weight:600;
+    margin:0;
+    letter-spacing:0.01em;
+  }
+  .subtitle{color:var(--text-dim); font-size:12.5px; margin-top:3px;}
+  .header-meta{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--text-faint);
+    text-align:right;
+    line-height:1.6;
+  }
+
+  /* ---- Layout ---- */
+  .layout{
+    display:grid;
+    grid-template-columns: minmax(0,1fr) 380px;
+    gap:0;
+    align-items:start;
+  }
+  @media (max-width: 980px){
+    .layout{grid-template-columns:1fr;}
+  }
+  main{padding:26px 28px 60px;}
+  aside{
+    position:sticky; top:0;
+    padding:26px 24px 60px;
+    border-left:1px solid var(--line);
+    min-height:100vh;
+    background:linear-gradient(180deg, rgba(201,118,74,0.04), transparent 200px);
+  }
+  @media (max-width: 980px){
+    aside{position:static; border-left:none; border-top:1px solid var(--line); min-height:0;}
+  }
+
+  section.card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:3px;
+    margin-bottom:18px;
+  }
+  .card-head{
+    padding:14px 18px;
+    border-bottom:1px solid var(--line-soft);
+    display:flex; align-items:baseline; justify-content:space-between;
+    gap:10px;
+  }
+  .card-head h2{
+    font-size:12.5px;
+    font-weight:600;
+    margin:0;
+    letter-spacing:0.03em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+  }
+  .card-num{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--text-faint);}
+  .card-body{padding:18px;}
+
+  /* ---- Form ---- */
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;}
+  @media (max-width:560px){ .grid2,.grid3{grid-template-columns:1fr;} }
+
+  .field{display:flex; flex-direction:column; gap:6px; margin-bottom:14px;}
+  .field:last-child{margin-bottom:0;}
+  .field label{
+    font-size:11.5px;
+    color:var(--text-dim);
+    display:flex; justify-content:space-between; gap:8px;
+  }
+  .field label .unit{color:var(--text-faint); font-family:'IBM Plex Mono',monospace;}
+  input[type=number], input[type=text], select{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--text);
+    border-radius:2px;
+    padding:9px 10px;
+    font-size:13.5px;
+    font-family:'IBM Plex Mono',monospace;
+    width:100%;
+  }
+  select{font-family:'IBM Plex Sans',sans-serif; cursor:pointer;}
+  input:focus, select:focus{
+    outline:none;
+    border-color:var(--copper);
+    box-shadow:0 0 0 1px var(--copper) inset;
+  }
+  .hint{font-size:11px; color:var(--text-faint); margin-top:2px;}
+
+  .divider{height:1px; background:var(--line-soft); margin:18px 0;}
+
+  /* ---- Inverter table ---- */
+  .inv-row{
+    display:grid;
+    grid-template-columns: 1fr 72px 72px 90px 26px;
+    gap:8px;
+    align-items:center;
+    margin-bottom:8px;
+  }
+  .inv-row-head{
+    display:grid;
+    grid-template-columns: 1fr 72px 72px 90px 26px;
+    gap:8px;
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+    color:var(--text-faint);
+    margin-bottom:8px;
+  }
+  .remove-btn{
+    width:26px;height:26px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--text-faint);
+    border-radius:2px;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;
+    line-height:1;
+  }
+  .remove-btn:hover{border-color:var(--bad); color:var(--bad);}
+  .add-btn{
+    margin-top:6px;
+    background:transparent;
+    border:1px dashed var(--line);
+    color:var(--text-dim);
+    padding:8px 12px;
+    border-radius:2px;
+    cursor:pointer;
+    font-size:12.5px;
+    width:100%;
+    font-family:'IBM Plex Sans',sans-serif;
+  }
+  .add-btn:hover{border-color:var(--copper); color:var(--copper-bright);}
+
+  .mini-btn{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--copper-bright);
+    padding:9px 14px;
+    border-radius:2px;
+    cursor:pointer;
+    font-size:12.5px;
+    font-family:'IBM Plex Sans',sans-serif;
+    white-space:nowrap;
+  }
+  .mini-btn:hover{border-color:var(--copper);}
+  .mini-btn:active{transform:translateY(1px);}
+
+  .current-total{
+    display:flex; justify-content:space-between; align-items:baseline;
+    padding-top:12px; margin-top:6px; border-top:1px solid var(--line-soft);
+  }
+  .current-total .label{font-size:12px; color:var(--text-dim);}
+  .current-total .value{font-family:'IBM Plex Mono',monospace; font-size:18px; color:var(--copper-bright);}
+
+  /* ---- Result cards ---- */
+  .result-card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:3px;
+    margin-bottom:16px;
+    overflow:hidden;
+  }
+  .result-head{
+    padding:13px 16px;
+    display:flex; justify-content:space-between; align-items:center;
+    border-bottom:1px solid var(--line-soft);
+    background:var(--panel-2);
+  }
+  .result-head .name{font-size:12px; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-dim); font-weight:600;}
+  .result-body{padding:16px;}
+  .cable-name{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:15px;
+    color:var(--copper-bright);
+    margin-bottom:2px;
+    word-break:break-word;
+  }
+  .cable-runs{font-size:12px; color:var(--text-dim); margin-bottom:14px;}
+  .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;}
+  .stat{
+    background:var(--panel-2);
+    border:1px solid var(--line-soft);
+    border-radius:2px;
+    padding:9px 10px;
+  }
+  .stat .k{font-size:10px; text-transform:uppercase; letter-spacing:0.03em; color:var(--text-faint); margin-bottom:4px;}
+  .stat .v{font-family:'IBM Plex Mono',monospace; font-size:14px;}
+  .bar-row{margin-top:10px;}
+  .bar-label{display:flex; justify-content:space-between; font-size:11px; color:var(--text-dim); margin-bottom:5px;}
+  .bar-track{height:6px; background:var(--panel-2); border-radius:3px; overflow:hidden; border:1px solid var(--line-soft);}
+  .bar-fill{height:100%; border-radius:3px;}
+  .status-line{
+    margin-top:12px;
+    font-size:11.5px;
+    padding:8px 10px;
+    border-radius:2px;
+    display:flex; gap:8px; align-items:flex-start;
+  }
+  .status-good{background:rgba(111,174,122,0.1); color:var(--good); border:1px solid rgba(111,174,122,0.25);}
+  .status-warn{background:rgba(212,162,76,0.1); color:var(--warn); border:1px solid rgba(212,162,76,0.25);}
+  .status-bad{background:rgba(201,106,90,0.1); color:var(--bad); border:1px solid rgba(201,106,90,0.25);}
+  .empty-note{color:var(--text-faint); font-size:12px; padding:6px 2px;}
+
+  footer{
+    padding:20px 28px 40px;
+    color:var(--text-faint);
+    font-size:11px;
+    border-top:1px solid var(--line-soft);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 40 40" fill="none">
+        <path d="M4 20 C10 20 10 10 16 10 L28 10" stroke="#c9764a" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M4 20 C10 20 10 30 16 30 L28 30" stroke="#a9b4bd" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="31" cy="10" r="3" fill="#c9764a"/>
+        <circle cx="31" cy="30" r="3" fill="#a9b4bd"/>
+      </svg>
+    </div>
+    <div>
+      <h1>AC Cable Selection</h1>
+      <div class="subtitle">Solar inverter AC cable sizing — current capacity, grouping &amp; voltage drop</div>
+    </div>
+  </div>
+  <div class="header-meta">
+    IEC-STYLE DERATING · Al / Cu · SWA / ABC<br>
+    Based on internal Cable Calculation Tool
+  </div>
+</header>
+
+<div class="layout">
+<main>
+
+  <!-- PROJECT PARAMETERS -->
+  <section class="card">
+    <div class="card-head"><h2>Project Parameters</h2><span class="card-num">01</span></div>
+    <div class="card-body">
+      <div class="grid2">
+        <div class="field">
+          <label>Main Cable Material</label>
+          <select id="material">
+            <option value="Al">Aluminium (Al)</option>
+            <option value="Cu">Copper (Cu)</option>
+          </select>
+        </div>
+        <div class="field"></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Main AC Cable Path Length <span class="unit">m</span></label>
+          <input type="number" id="mainLength" value="100" step="1" min="1">
+        </div>
+        <div class="field">
+          <label>Main Cable Path (installation)</label>
+          <select id="mainMethod">
+            <option value="freeair">Free Air (Method F)</option>
+            <option value="enclosed">Enclosed (Method B)</option>
+            <option value="underground">Underground</option>
+            <option value="overhead">Overhead</option>
+          </select>
+        </div>
+        <div class="field" id="mainCableTypeField">
+          <label>Main Cable Construction</label>
+          <select id="mainCableType"></select>
+        </div>
+        <div class="field"></div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Sub AC Cable Length <span class="unit">m</span></label>
+          <input type="number" id="subLength" value="0" step="1" min="0">
+        </div>
+        <div class="field">
+          <label>Sub Main Cable Path (installation)</label>
+          <select id="subMethod">
+            <option value="freeair">Free Air (Method F)</option>
+            <option value="enclosed">Enclosed (Method B)</option>
+            <option value="underground">Underground</option>
+            <option value="overhead">Overhead</option>
+          </select>
+        </div>
+        <div class="field" id="subCableTypeField">
+          <label>Sub Cable Construction</label>
+          <select id="subCableType"></select>
+        </div>
+        <div class="field"></div>
+      </div>
+      <div class="hint">Sub cable is only sized when its length is greater than 0.</div>
+    </div>
+  </section>
+
+  <!-- INVERTER LOAD -->
+  <section class="card">
+    <div class="card-head"><h2>Inverter Load</h2><span class="card-num">02</span></div>
+    <div class="card-body">
+      <div class="hint" style="margin-bottom:12px;">Select the inverter models and how many sit at each location. This is what drives the current used below — the Main AC cable carries the combined Main + Sub current, the Sub AC cable carries only its own location's current.</div>
+      <div class="inv-row-head">
+        <div>Inverter model</div><div>Main qty</div><div>Sub qty</div><div>Current</div><div></div>
+      </div>
+      <div id="invRows"></div>
+      <button class="add-btn" id="addInvRow" type="button">+ Add inverter line</button>
+
+      <div class="divider"></div>
+
+      <div class="field">
+        <label>Additional Current <span class="unit">A</span></label>
+        <input type="number" id="additionalCurrent" value="0" step="1" min="0">
+        <div class="hint">Added on top of the combined inverter current for the Main cable only (matches the workbook's Additional Current cell).</div>
+      </div>
+
+      <div class="field">
+        <label>kVA → Amps Converter <span class="unit">400V, 3-phase</span></label>
+        <div style="display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center;">
+          <input type="number" id="kvaInput" placeholder="e.g. 100" step="1" min="0">
+          <button class="mini-btn" id="addKvaBtn" type="button">+ Add to Additional Current</button>
+        </div>
+        <div class="hint">= <span id="kvaResult" class="mono">0.0 A</span> &nbsp;(I = kVA × 1000 / (√3 × 400))</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="current-total">
+        <div class="label">Main location inverter current</div>
+        <div class="value mono" id="mainInvTotal">0.0 A</div>
+      </div>
+      <div class="current-total">
+        <div class="label">Sub location inverter current</div>
+        <div class="value mono" id="subInvTotal">0.0 A</div>
+      </div>
+      <div class="current-total">
+        <div class="label">+ Additional current (Main only)</div>
+        <div class="value mono" id="additionalDisplay" style="color:var(--alu); font-size:15px;">0.0 A</div>
+      </div>
+      <div class="current-total">
+        <div class="label" style="font-weight:600; color:var(--text);">= Main cable current</div>
+        <div class="value mono" id="mainCableTotal" style="font-size:20px;">0.0 A</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<aside>
+  <section class="card">
+    <div class="card-head"><h2>Calculation Targets</h2></div>
+    <div class="card-body">
+      <div class="field">
+        <label>Allowable Voltage Drop <span class="unit">%</span></label>
+        <input type="number" id="vdAllow" value="2" step="0.1" min="0.1">
+      </div>
+      <div class="field">
+        <label>Allowable Current Margin <span class="unit">%</span></label>
+        <input type="number" id="margin" value="10" step="1" min="0">
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Result — Main Cable</h2></div>
+    <div class="card-body" id="mainResult"></div>
+  </section>
+
+  <section class="card" id="subResultCard">
+    <div class="card-head"><h2>Result — Sub Cable</h2></div>
+    <div class="card-body" id="subResult"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Load Summary</h2></div>
+    <div class="card-body" id="loadSummary"></div>
+  </section>
+</aside>
+</div>
+
+<footer>
+  Cable ampacity, grouping and voltage-drop coefficients carried over from the source workbook's "Cable Selection" and "Sheet2" tables (Al/Cu, unarmoured, SWA armoured, and ABC families). Installation-method temperature/enclosure factor and parallel-run grouping factors applied per that data. Verify against the applicable wiring regulation before construction.
+</footer>
+
+<script>
+/* =========================================================================
+   CABLE DATABASE
+   Extracted from the workbook's "Cable Selection" sheet.
+   methodE  = free-air rated current (Method E / reference method used for "Free Air")
+   methodB  = enclosed / conduit rated current (Method B)
+   underground = direct-buried armoured rated current
+   overhead    = ABC (aerial bundled conductor) rated current
+   vd = voltage-drop coefficient (mV/A/m style factor used by the sheet, /4000 => %)
+   ========================================================================= */
+const CABLE_DB = {
+  Al: {
+    unarmoured: [ // Free Air (methodE) / Enclosed (methodB)
+      {size:25,  label:'25 mm² 4C Al PVC/PVC',        methodE:97,  methodB:84,  vd:2.7},
+      {size:35,  label:'35 mm² 4C Al XLPE/PVC',        methodE:120, methodB:103, vd:1.95},
+      {size:50,  label:'50 mm² 4C Al XLPE/PVC',        methodE:146, methodB:124, vd:1.45},
+      {size:70,  label:'70 mm² 4C Al XLPE/PVC',        methodE:187, methodB:156, vd:0.97},
+      {size:95,  label:'95 mm² 4C Al XLPE/PVC',        methodE:227, methodB:188, vd:0.72},
+      {size:120, label:'120 mm² 4C Al XLPE/PVC',       methodE:263, methodB:216, vd:0.58},
+      {size:150, label:'150 mm² 4C Al XLPE/PVC',       methodE:304, methodB:240, vd:0.47},
+      {size:185, label:'185 mm² 4C Al XLPE/PVC',       methodE:347, methodB:272, vd:0.39},
+      {size:240, label:'240 mm² 4C Al XLPE/PVC',       methodE:409, methodB:318, vd:0.31},
+      {size:300, label:'300 mm² 4C Al XLPE/PVC',       methodE:471, methodB:364, vd:0.26},
+    ],
+    armoured: [ // Free Air (freeair) / Underground (underground) - SWA
+      {size:25,  label:'25 mm² 4C Al PVC/SWA/PVC',     freeair:98,  underground:116, vd:2.7},
+      {size:35,  label:'35 mm² 4C Al XLPE/SWA/PVC',    freeair:120, underground:139, vd:1.95},
+      {size:50,  label:'50 mm² 4C Al XLPE/SWA/PVC',    freeair:145, underground:165, vd:1.45},
+      {size:70,  label:'70 mm² 4C Al XLPE/SWA/PVC',    freeair:185, underground:203, vd:0.97},
+      {size:95,  label:'95 mm² 4C Al XLPE/SWA/PVC',    freeair:224, underground:244, vd:0.72},
+      {size:120, label:'120 mm² 4C Al XLPE/SWA/PVC',   freeair:264, underground:278, vd:0.58},
+      {size:150, label:'150 mm² 4C Al XLPE/SWA/PVC',   freeair:305, underground:311, vd:0.47},
+      {size:185, label:'185 mm² 4C Al XLPE/SWA/PVC',   freeair:350, underground:353, vd:0.39},
+      {size:240, label:'240 mm² 4C Al XLPE/SWA/PVC',   freeair:418, underground:409, vd:0.31},
+      {size:300, label:'300 mm² 4C Al XLPE/SWA/PVC',   freeair:488, underground:461, vd:0.26},
+    ],
+    abc: [ // Overhead
+      {size:25,  label:'3x25 + N54.6 mm² ABC cable',   overhead:112, vd:2.2},
+      {size:35,  label:'3x35 + N54.6 mm² ABC cable',   overhead:138, vd:1.65},
+      {size:50,  label:'3x50 + N54.6 mm² ABC cable',   overhead:168, vd:1.27},
+      {size:70,  label:'3x70 + N54.6 mm² ABC cable',   overhead:213, vd:0.87},
+      {size:95,  label:'3x95 + N70 mm² ABC cable',     overhead:258, vd:0.67},
+      {size:120, label:'3x120 + N70 mm² ABC cable',    overhead:300, vd:0.55},
+      {size:150, label:'3x150 + N70 mm² ABC cable',    overhead:344, vd:0.46},
+    ],
+  },
+  Cu: {
+    unarmoured: [
+      {size:6,   label:'6 mm² 4C Cu PVC/PVC',          methodE:43,  methodB:34,  vd:6.4},
+      {size:10,  label:'10 mm² 4C Cu PVC/PVC',         methodE:60,  methodB:46,  vd:3.8},
+      {size:16,  label:'16 mm² 4C Cu PVC/PVC',         methodE:80,  methodB:62,  vd:2.4},
+      {size:25,  label:'25 mm² 4C Cu XLPE/PVC',        methodE:127, methodB:105, vd:1.65},
+      {size:35,  label:'35 mm² 4C Cu XLPE/PVC',        methodE:158, methodB:128, vd:1.15},
+      {size:50,  label:'50 mm² 4C Cu XLPE/PVC',        methodE:192, methodB:154, vd:0.87},
+      {size:70,  label:'70 mm² 4C Cu XLPE/PVC',        methodE:246, methodB:194, vd:0.6},
+      {size:95,  label:'95 mm² 4C Cu XLPE/PVC',        methodE:298, methodB:233, vd:0.45},
+      {size:120, label:'120 mm² 4C Cu XLPE/PVC',       methodE:346, methodB:268, vd:0.37},
+      {size:150, label:'150 mm² 4C Cu XLPE/PVC',       methodE:399, methodB:300, vd:0.3},
+      {size:185, label:'185 mm² 4C Cu XLPE/PVC',       methodE:456, methodB:340, vd:0.26},
+      {size:240, label:'240 mm² 4C Cu XLPE/PVC',       methodE:538, methodB:398, vd:0.21},
+      {size:300, label:'300 mm² 4C Cu XLPE/PVC',       methodE:621, methodB:455, vd:0.185},
+    ],
+    armoured: [
+      {size:6,   label:'6 mm² 4C Cu PVC/SWA/PVC',      freeair:45,  underground:59,  vd:6.4},
+      {size:10,  label:'10 mm² 4C Cu PVC/SWA/PVC',     freeair:62,  underground:78,  vd:3.8},
+      {size:16,  label:'16 mm² 4C Cu PVC/SWA/PVC',     freeair:83,  underground:101, vd:2.4},
+      {size:25,  label:'25 mm² 4C Cu XLPE/SWA/PVC',    freeair:131, underground:152, vd:1.65},
+      {size:35,  label:'35 mm² 4C Cu XLPE/SWA/PVC',    freeair:162, underground:182, vd:1.15},
+      {size:50,  label:'50 mm² 4C Cu XLPE/SWA/PVC',    freeair:197, underground:217, vd:0.87},
+      {size:70,  label:'70 mm² 4C Cu XLPE/SWA/PVC',    freeair:251, underground:266, vd:0.6},
+      {size:95,  label:'95 mm² 4C Cu XLPE/SWA/PVC',    freeair:304, underground:319, vd:0.45},
+      {size:120, label:'120 mm² 4C Cu XLPE/SWA/PVC',   freeair:353, underground:363, vd:0.37},
+      {size:150, label:'150 mm² 4C Cu XLPE/SWA/PVC',   freeair:406, underground:406, vd:0.3},
+      {size:185, label:'185 mm² 4C Cu XLPE/SWA/PVC',   freeair:463, underground:458, vd:0.26},
+      {size:240, label:'240 mm² 4C Cu XLPE/SWA/PVC',   freeair:546, underground:529, vd:0.21},
+      {size:300, label:'300 mm² 4C Cu XLPE/SWA/PVC',   freeair:628, underground:592, vd:0.185},
+    ],
+    abc: [], // ABC not available in Cu in the source sheet
+  }
+};
+
+// Which constructions are valid for which installation method (mirrors Sheet2's mapping table)
+const METHOD_MAP = {
+  freeair:     {label:'Free Air (Method F)', factor:0.96, group:'bunched', types:['unarmoured','armoured']},
+  enclosed:    {label:'Enclosed (Method B)', factor:0.96, group:'bunched', types:['unarmoured']},
+  underground: {label:'Underground',         factor:0.89, group:'buried',  types:['armoured']},
+  overhead:    {label:'Overhead',            factor:0.96, group:'bunched', types:['abc']},
+};
+
+const TYPE_LABEL = {unarmoured:'Unarmoured', armoured:'Armoured (SWA)', abc:'ABC (aerial bundled)'};
+
+// Grouping / derating factor for N parallel runs bunched together (BS7671-style Table 4C1)
+const GROUP_BUNCHED = [1, 0.88, 0.82, 0.77, 0.75, 0.73, 0.73, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72, 0.72];
+// Grouping factor for N parallel circuits direct buried underground
+const GROUP_BURIED  = [1, 0.81, 0.70, 0.63, 0.59, 0.55, 0.52, 0.50, 0.48, 0.47, 0.45, 0.44, 0.44, 0.44, 0.44, 0.44, 0.44, 0.44, 0.44, 0.44];
+
+function groupFactor(kind, n){
+  const arr = kind === 'buried' ? GROUP_BURIED : GROUP_BUNCHED;
+  return arr[Math.min(n, arr.length) - 1];
+}
+
+function ratedFor(cable, methodKey){
+  if (methodKey === 'freeair')     return cable.methodE ?? cable.freeair;
+  if (methodKey === 'enclosed')    return cable.methodB;
+  if (methodKey === 'underground') return cable.underground;
+  if (methodKey === 'overhead')    return cable.overhead;
+  return null;
+}
+
+/* =========================================================================
+   INVERTER DATABASE  (per-unit AC output current, A)
+   ========================================================================= */
+const INVERTER_DB = [
+  {brand:'KACO',   model:'blueplanet 125 NX3 M10', current:182},
+  {brand:'KACO',   model:'blueplanet 100 NX3 M8',  current:182},
+  {brand:'KACO',   model:'blueplanet 60 NX3 M5',   current:95.3},
+  {brand:'KACO',   model:'blueplanet 50 NX3 M5',   current:83.6},
+  {brand:'KACO',   model:'blueplanet 20.0 NX3 M2', current:31.9},
+  {brand:'KACO',   model:'blueplanet 15.0 NX3 M2', current:24},
+  {brand:'KACO',   model:'blueplanet 10.0 NX3 M2', current:16},
+
+  {brand:'Sunways', model:'STT-110KTL',    current:178.8},
+  {brand:'Sunways', model:'STT-100KTL',    current:158.8},
+  {brand:'Sunways', model:'STT-80KTL',     current:127},
+  {brand:'Sunways', model:'STT-60KTL-P',   current:95.3},
+  {brand:'Sunways', model:'STT-50KTL-P',   current:83.6},
+  {brand:'Sunways', model:'STT-60KTL-M',   current:95.7},
+  {brand:'Sunways', model:'STT-50KTL-M',   current:79.7},
+  {brand:'Sunways', model:'STT-45KTL',     current:71.7},
+  {brand:'Sunways', model:'STT-40KTL',     current:63.8},
+  {brand:'Sunways', model:'STT-36KTL',     current:57.4},
+  {brand:'Sunways', model:'STT-33KTL',     current:52.6},
+  {brand:'Sunways', model:'STT-30KTL',     current:47.8},
+  {brand:'Sunways', model:'STT-29.9KTL',   current:43.3},
+  {brand:'Sunways', model:'STT-25KTL-P',   current:39},
+  {brand:'Sunways', model:'STT-20KTL-P',   current:31.9},
+  {brand:'Sunways', model:'STT-17KTL-P',   current:28.4},
+  {brand:'Sunways', model:'STT-15KTL-P',   current:25},
+  {brand:'Sunways', model:'STT-12KTL-P',   current:20},
+  {brand:'Sunways', model:'STT-10KTL-P',   current:16.5},
+
+  {brand:'Huawei', model:'Sun2000-150K-MG0',  current:240.5},
+  {brand:'Huawei', model:'Sun2000-115KTL-M2', current:182.3},
+  {brand:'Huawei', model:'Sun2000-100KTL-M2', current:160.4},
+  {brand:'Huawei', model:'Sun2000-50KTL-M3',  current:79.8},
+  {brand:'Huawei', model:'Sun2000-40KTL-M3',  current:63.8},
+  {brand:'Huawei', model:'Sun2000-36KTL-M3',  current:58},
+  {brand:'Huawei', model:'Sun2000-30KTL-M3',  current:47.9},
+  {brand:'Huawei', model:'Sun2000-25KTL-M5',  current:39.9},
+  {brand:'Huawei', model:'Sun2000-20KTL-M5',  current:31.9},
+  {brand:'Huawei', model:'Sun2000-17KTL-M5',  current:27.1},
+  {brand:'Huawei', model:'Sun2000-15KTL-M5',  current:23.9},
+  {brand:'Huawei', model:'Sun2000-12KTL-M5',  current:17.3},
+  {brand:'Huawei', model:'Sun2000-10KTL-M1',  current:15},
+
+  {brand:'Sungrow', model:'SG150CX',       current:240.6},
+  {brand:'Sungrow', model:'SG125CX-P2',    current:189.9},
+  {brand:'Sungrow', model:'SG125CX-P3',    current:181.1},
+
+  {brand:'Sunways Hybrid', model:'STH-33KTL-HT',  current:55},
+  {brand:'Sunways Hybrid', model:'STH-30KTL-HT',  current:50},
+  {brand:'Sunways Hybrid', model:'STH-25KTL-HT',  current:41.7},
+  {brand:'Sunways Hybrid', model:'STH-20KTL-HT',  current:33.3},
+  {brand:'Sunways Hybrid', model:'STH-17KTL-HT',  current:28.3},
+  {brand:'Sunways Hybrid', model:'STH-15KTL-HT',  current:25},
+  {brand:'Sunways Hybrid', model:'STH-12KTL-HTP', current:20},
+  {brand:'Sunways Hybrid', model:'STH-10KTL-HTP', current:16.5},
+
+  {brand:'ATESS',  model:'HPS-125KTL',  current:181},
+  {brand:'ATESS',  model:'HPS-100KTL',  current:144},
+  {brand:'ATESS',  model:'HPS-150HV',   current:217},
+  {brand:'ATESS',  model:'HPS-100HV',   current:144},
+  {brand:'ATESS',  model:'HPS-150',     current:217},
+  {brand:'ATESS',  model:'HPS-120',     current:173},
+  {brand:'ATESS',  model:'HPS-100',     current:144},
+  {brand:'ATESS',  model:'HPS-50',      current:72},
+  {brand:'ATESS',  model:'HPS-30',      current:43},
+  {brand:'ATESS',  model:'HPS-50KTL',   current:72},
+  {brand:'ATESS',  model:'HPS-40KTL',   current:57},
+  {brand:'ATESS',  model:'HPS-30KTL',   current:43},
+  {brand:'ATESS',  model:'HPS-20KTL',   current:28},
+  {brand:'ATESS',  model:'HPS-15KTL',   current:21},
+];
+
+const MAX_RUNS = 60;
+
+// For one specific cable in the family: smallest number of parallel runs
+// that satisfies BOTH current capacity and voltage drop. Returns null if
+// even MAX_RUNS isn't enough.
+function minRunsFor(cable, method, base, loadCurrent, requiredCapacity, lengthM, vdAllowPct){
+  let nCurrent = null;
+  for (let n=1; n<=MAX_RUNS; n++){
+    const cap = n * base * method.factor * groupFactor(method.group, n);
+    if (cap >= requiredCapacity){ nCurrent = n; break; }
+  }
+  if (nCurrent === null) return null;
+
+  // Capacity(n) is monotonically non-decreasing in n for both grouping
+  // tables used here, so nCurrent is a true minimum - voltage drop (which
+  // falls as 1/n) can only push the run count up from there, never down.
+  const nVdNeeded = (loadCurrent * lengthM * cable.vd) / (vdAllowPct * 4000);
+  return Math.max(nCurrent, Math.ceil(nVdNeeded - 1e-9), 1);
+}
+
+function selectCable(material, methodKey, cableType, loadCurrent, marginPct, lengthM, vdAllowPct){
+  const method = METHOD_MAP[methodKey];
+  if (!method) return null;
+  const family = CABLE_DB[material][cableType];
+  if (!family || family.length === 0) return null;
+
+  const requiredCapacity = loadCurrent * (1 + marginPct/100);
+
+  // Minimum runs needed for every size in the family (smallest cable that
+  // works may need more runs than the largest - that's expected).
+  const perSize = family.map(cable => {
+    const base = ratedFor(cable, methodKey);
+    if (!base) return {cable, runs:null};
+    return {cable, runs: minRunsFor(cable, method, base, loadCurrent, requiredCapacity, lengthM, vdAllowPct)};
+  }).filter(r => r.runs !== null);
+
+  if (perSize.length === 0){
+    const largest = family[family.length-1];
+    return {cable: largest, runs:null, overflow:true, requiredCapacity};
+  }
+
+  // Fewest parallel runs achievable by any size in the family...
+  const globalMinRuns = Math.min(...perSize.map(r => r.runs));
+  // ...and among sizes that hit that same minimum, the smallest (cheapest)
+  // one - no reason to force a bigger cable if a smaller one does the job
+  // in the same number of runs.
+  const chosen = perSize.find(r => r.runs === globalMinRuns);
+
+  const {cable, runs} = chosen;
+  const base = ratedFor(cable, methodKey);
+  const capacity = runs * base * method.factor * groupFactor(method.group, runs);
+  const vdPct = (loadCurrent * lengthM * cable.vd) / (runs * 4000);
+  const minRunsForCurrentAlone = (() => {
+    for (let n=1; n<=MAX_RUNS; n++){
+      if (n * base * method.factor * groupFactor(method.group, n) >= requiredCapacity) return n;
+    }
+    return null;
+  })();
+
+  return {cable, runs, capacity, vdPct, requiredCapacity, vdDriven: runs > minRunsForCurrentAlone};
+}
+
+/* =========================================================================
+   UI WIRING
+   ========================================================================= */
+const $ = id => document.getElementById(id);
+
+function populateCableTypes(selectId, methodKey){
+  const sel = $(selectId);
+  const method = METHOD_MAP[methodKey];
+  const material = $('material').value;
+  const prev = sel.value;
+  sel.innerHTML = '';
+  method.types.forEach(t=>{
+    const family = CABLE_DB[material][t];
+    if (!family || family.length===0) return; // e.g. Cu has no ABC
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = TYPE_LABEL[t];
+    sel.appendChild(opt);
+  });
+  if ([...sel.options].some(o=>o.value===prev)) sel.value = prev;
+}
+
+function refreshCableTypeOptions(){
+  populateCableTypes('mainCableType', $('mainMethod').value);
+  populateCableTypes('subCableType', $('subMethod').value);
+}
+
+// ---- Inverter rows ----
+let invRowId = 0;
+function addInvRow(prefill){
+  const id = 'inv'+(invRowId++);
+  const row = document.createElement('div');
+  row.className = 'inv-row';
+  row.dataset.id = id;
+
+  const sel = document.createElement('select');
+  sel.innerHTML = INVERTER_DB.map(inv=>`<option value="${inv.model}" data-current="${inv.current}">${inv.brand} · ${inv.model} (${inv.current}A)</option>`).join('');
+
+  const mainQty = document.createElement('input');
+  mainQty.type = 'number'; mainQty.min = '0'; mainQty.step='1'; mainQty.value = prefill?.mainQty ?? 1;
+  mainQty.className = 'mono';
+  mainQty.title = 'Main location qty';
+
+  const subQty = document.createElement('input');
+  subQty.type = 'number'; subQty.min = '0'; subQty.step='1'; subQty.value = prefill?.subQty ?? 0;
+  subQty.className = 'mono';
+  subQty.title = 'Sub location qty';
+
+  const currentDisplay = document.createElement('input');
+  currentDisplay.type = 'text';
+  currentDisplay.readOnly = true;
+  currentDisplay.className = 'mono';
+  currentDisplay.style.opacity = '0.7';
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'remove-btn'; removeBtn.type='button'; removeBtn.innerHTML='&times;';
+  removeBtn.onclick = ()=>{ row.remove(); recalc(); };
+
+  row.appendChild(sel); row.appendChild(mainQty); row.appendChild(subQty); row.appendChild(currentDisplay); row.appendChild(removeBtn);
+  $('invRows').appendChild(row);
+
+  if (prefill?.model) sel.value = prefill.model;
+
+  function updateLine(){
+    const cur = parseFloat(sel.selectedOptions[0].dataset.current);
+    const mq = parseFloat(mainQty.value)||0;
+    const sq = parseFloat(subQty.value)||0;
+    currentDisplay.value = (cur*(mq+sq)).toFixed(1)+' A';
+    recalc();
+  }
+  sel.onchange = updateLine;
+  mainQty.oninput = updateLine;
+  subQty.oninput = updateLine;
+  updateLine();
+}
+
+function inverterTotals(){
+  let mainTotal = 0, subTotal = 0;
+  document.querySelectorAll('#invRows .inv-row').forEach(row=>{
+    const sel = row.querySelector('select');
+    const [mainQty, subQty] = row.querySelectorAll('input[type=number]');
+    const cur = parseFloat(sel.selectedOptions[0].dataset.current)||0;
+    mainTotal += cur*(parseFloat(mainQty.value)||0);
+    subTotal  += cur*(parseFloat(subQty.value)||0);
+  });
+  return {mainTotal, subTotal};
+}
+
+// ---- Rendering results ----
+function renderResult(targetId, res, loadCurrent, vdAllow){
+  const el = $(targetId);
+  if (!res){
+    el.innerHTML = `<div class="empty-note">No construction is valid for this combination of material / installation method.</div>`;
+    return;
+  }
+  if (res.overflow){
+    el.innerHTML = `<div class="empty-note">Even ${MAX_RUNS} parallel runs of the largest cable in this family (${res.cable.label}) can't carry ${res.requiredCapacity.toFixed(0)} A. Check the load or installation method.</div>`;
+    return;
+  }
+
+  const utilPct = Math.min(100, (res.requiredCapacity/res.capacity)*100);
+  const vdBarPct = Math.min(100, (res.vdPct/vdAllow)*100);
+  const st = res.vdDriven
+    ? {cls:'status-warn', text:`Run count increased beyond the current-only minimum to bring voltage drop (${res.vdPct.toFixed(2)}%) within the ${vdAllow}% limit.`}
+    : {cls:'status-good', text:`Current capacity and voltage drop (${res.vdPct.toFixed(2)}% of ${vdAllow}% allowed) both satisfied.`};
+
+  el.innerHTML = `
+    <div class="cable-name">${res.cable.label}</div>
+    <div class="cable-runs">${res.runs} × parallel run${res.runs>1?'s':''} · smallest cable that meets both limits at this run count</div>
+    <div class="stat-grid">
+      <div class="stat"><div class="k">Load current</div><div class="v">${loadCurrent.toFixed(1)} A</div></div>
+      <div class="stat"><div class="k">Required (w/ margin)</div><div class="v">${res.requiredCapacity.toFixed(1)} A</div></div>
+      <div class="stat"><div class="k">Group capacity</div><div class="v">${res.capacity.toFixed(1)} A</div></div>
+      <div class="stat"><div class="k">Voltage drop</div><div class="v">${res.vdPct.toFixed(2)}%</div></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label"><span>Current utilisation</span><span>${utilPct.toFixed(0)}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${utilPct}%; background:${utilPct>90?'var(--warn)':'var(--copper)'}"></div></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label"><span>Voltage drop vs allowed</span><span>${vdBarPct.toFixed(0)}%</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${vdBarPct}%; background:${res.vdDriven?'var(--warn)':'var(--alu)'}"></div></div>
+    </div>
+    <div class="status-line ${st.cls}">${st.text}</div>
+  `;
+}
+
+function recalc(){
+  const material = $('material').value;
+  const vdAllow = parseFloat($('vdAllow').value)||2;
+  const margin = parseFloat($('margin').value)||0;
+  const additional = parseFloat($('additionalCurrent').value)||0;
+
+  const {mainTotal, subTotal} = inverterTotals();
+  $('mainInvTotal').textContent = mainTotal.toFixed(1)+' A';
+  $('subInvTotal').textContent = subTotal.toFixed(1)+' A';
+
+  // Main AC cable carries the combined Main + Sub inverter current, plus Additional Current.
+  const mainLoadCurrent = mainTotal + subTotal + additional;
+  // Sub AC cable carries only its own location's current (no Additional Current, per the workbook).
+  const subLoadCurrent = subTotal;
+
+  $('additionalDisplay').textContent = additional.toFixed(1)+' A';
+  $('mainCableTotal').textContent = mainLoadCurrent.toFixed(1)+' A';
+
+  // Main
+  const mainMethod = $('mainMethod').value;
+  const mainType = $('mainCableType').value;
+  const mainLength = parseFloat($('mainLength').value)||0;
+  const mainReq = mainLoadCurrent*(1+margin/100);
+  const mainRes = selectCable(material, mainMethod, mainType, mainLoadCurrent, margin, mainLength, vdAllow);
+  renderResult('mainResult', mainRes, mainLoadCurrent, vdAllow);
+
+  // Sub
+  const subLength = parseFloat($('subLength').value)||0;
+  const subCard = $('subResultCard');
+  if (subLength > 0){
+    subCard.style.display = '';
+    const subMethod = $('subMethod').value;
+    const subType = $('subCableType').value;
+    const subRes = selectCable(material, subMethod, subType, subLoadCurrent, margin, subLength, vdAllow);
+    renderResult('subResult', subRes, subLoadCurrent, vdAllow);
+  } else {
+    subCard.style.display = 'none';
+  }
+
+  // Load summary
+  $('loadSummary').innerHTML = `
+    <div class="stat-grid" style="grid-template-columns:1fr;">
+      <div class="stat"><div class="k">Main location inverter current</div><div class="v">${mainTotal.toFixed(1)} A</div></div>
+      <div class="stat"><div class="k">Sub location inverter current</div><div class="v">${subTotal.toFixed(1)} A</div></div>
+      <div class="stat"><div class="k">+ Additional current (Main only)</div><div class="v">${additional.toFixed(1)} A</div></div>
+      <div class="stat"><div class="k">= Main cable load current</div><div class="v" style="color:var(--copper-bright)">${mainLoadCurrent.toFixed(1)} A</div></div>
+      <div class="stat"><div class="k">Main sizing current (+${margin}% margin)</div><div class="v">${mainReq.toFixed(1)} A</div></div>
+    </div>
+  `;
+}
+
+// ---- Init ----
+['material','mainMethod','mainCableType','subMethod','subCableType','vdAllow','margin','additionalCurrent','mainLength','subLength']
+  .forEach(id=>{
+    $(id).addEventListener('change', ()=>{
+      if (id==='material' || id==='mainMethod' || id==='subMethod') refreshCableTypeOptions();
+      recalc();
+    });
+    $(id).addEventListener('input', recalc);
+  });
+
+refreshCableTypeOptions();
+addInvRow({model:'HPS-125KTL', mainQty:6, subQty:0});
+addInvRow({model:'HPS-100KTL', mainQty:1, subQty:0});
+addInvRow({model:'HPS-150HV', mainQty:1, subQty:0});
+$('addInvRow').addEventListener('click', ()=>addInvRow());
+recalc();
+
+// ---- kVA -> Amps converter (400V, 3-phase) ----
+function kvaToAmps(kva, voltage=400){
+  return (kva*1000) / (Math.sqrt(3) * voltage);
+}
+function updateKvaResult(){
+  const kva = parseFloat($('kvaInput').value)||0;
+  const amps = kvaToAmps(kva);
+  $('kvaResult').textContent = amps.toFixed(1)+' A';
+}
+$('kvaInput').addEventListener('input', updateKvaResult);
+$('addKvaBtn').addEventListener('click', ()=>{
+  const kva = parseFloat($('kvaInput').value)||0;
+  if (kva <= 0) return;
+  const amps = kvaToAmps(kva);
+  const additionalField = $('additionalCurrent');
+  additionalField.value = ((parseFloat(additionalField.value)||0) + amps).toFixed(1);
+  $('kvaInput').value = '';
+  updateKvaResult();
+  recalc();
+});
+updateKvaResult();
+
+// ---- PWA: register service worker ----
+if ('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
